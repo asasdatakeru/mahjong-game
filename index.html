@@ -53,7 +53,7 @@
     .seat.left .discard, .seat.right .discard{grid-template-columns:repeat(3,36px)}
 
     /* 壁（中央プレビュー） */
-    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:1}
+    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:
     .wall-preview{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:220px}
 
     /* 牌（CSSで麻雀牌風） */
@@ -93,12 +93,14 @@
       <div class="seat top" id="seatTop">
         <div class="name">対面（上）</div>
         <div class="hand" id="handTop"></div>
+        <div class="wall-side horiz" id="wallTop"></div>
         <div class="discard" id="discardTop"></div>
       </div>
 
       <!-- 左（かみちゃ） → 捨て牌は中央側（右） -->
       <div class="seat left" id="seatLeft">
         <div class="hand" id="handLeft"></div>
+        <div class="wall-side vert" id="wallLeft"></div>
         <div class="discard" id="discardLeft"></div>
         <div class="name" style="writing-mode:vertical-rl;">左（かみちゃ）</div>
       </div>
@@ -106,19 +108,25 @@
       <!-- 右（しもちゃ） → 捨て牌は中央側（左） -->
       <div class="seat right" id="seatRight">
         <div class="hand" id="handRight"></div>
+        <div class="wall-side vert" id="wallRight"></div>
         <div class="discard" id="discardRight"></div>
         <div class="name" style="writing-mode:vertical-rl;">右（しもちゃ）</div>
       </div>
 
-      <!-- 下（あなた） → 捨て牌は手牌の上（中央側） -->
+      <!-- 下（あなた） → 手前: 手牌 → 山 → 捨て牌（中央） -->
       <div class="seat bottom" id="seatBottom">
-        <div class="discard" id="discardBottom"></div>
         <div class="hand" id="handBottom"></div>
+        <div class="wall-side horiz" id="wallBottom"></div>
+        <div class="discard" id="discardBottom"></div>
         <div class="name">あなた</div>
       </div>
 
-      <!-- 中央：壁プレビュー -->
+      <!-- 中央：雀卓の機械（飾り） -->
       <div class="center">
+        <div class="machine">
+          <div class="wind">東 1局</div>
+          <div class="dice">⚀⚄</div>
+        </div>
         <div class="wall-preview" id="wallPreview"></div>
         <div class="info">山（左が先頭） • CPUはツモ切りで自動進行／ページ読み込みで自動配牌</div>
       </div>
