@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>見下ろし麻雀デモ（自動配牌・各席前に捨て牌・CSS牌）</title>
+  <title>見下ろし麻雀デモ（各席の山・各席前に捨て牌・CSS牌）</title>
   <style>
     :root{
       --table:#0b5d37; --bg:#0b2f1e;
@@ -18,7 +18,7 @@
     .wrap{max-width:1200px;margin:18px auto;padding:12px}
     h1{margin:0 0 10px;color:#f8fafc;font-size:18px}
 
-    .table{background:var(--table);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,0.6);position:relative;height:680px;overflow:hidden}
+    .table{background:var(--table);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,0.6);position:relative;height:700px;overflow:hidden}
     .hud{position:absolute;right:14px;top:14px;display:flex;gap:8px;align-items:center;z-index:10}
     .btn{background:#115e43;color:#eafaf0;padding:8px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
     .info{font-size:13px;color:#cfead0}
@@ -28,18 +28,16 @@
     .seat{position:absolute;display:flex;align-items:center;gap:10px;pointer-events:auto}
     .seat .name{font-weight:700;color:#e6f8ea;font-size:13px;text-shadow:0 1px 0 rgba(0,0,0,.3)}
 
-    /* 対面（上）: 捨て牌は手牌の下（中央側） */
+    /* 対面（上）: 手前=上端 → 中央へ下方向に 手牌→山→捨て牌 */
     .seat.top{top:12px;left:50%;transform:translateX(-50%);flex-direction:column}
-    .seat.top .hand{order:1}
-    .seat.top .discard{order:2}
 
-    /* 自分（下）: 捨て牌は手牌の上（中央側） */
-    .seat.bottom{bottom:12px;left:50%;transform:translateX(-50%);flex-direction:column-reverse}
+    /* 自分（下）: 手前=下端 → 中央へ上方向に 手牌→山→捨て牌 */
+    .seat.bottom{bottom:12px;left:50%;transform:translateX(-50%);flex-direction:column}
 
-    /* 左（かみちゃ）: 手牌の右が中央。捨て牌は右側に置く */
+    /* 左（かみちゃ）: 左端→中央  手牌→山→捨て牌 */
     .seat.left{left:12px;top:50%;transform:translateY(-50%);flex-direction:row}
 
-    /* 右（しもちゃ）: 手牌の左が中央。捨て牌は左側に置く */
+    /* 右（しもちゃ）: 右端→中央  手牌→山→捨て牌 */
     .seat.right{right:12px;top:50%;transform:translateY(-50%);flex-direction:row-reverse}
 
     /* 手牌：上下は横、左右は縦 */
@@ -48,49 +46,30 @@
     .seat.right .hand{flex-direction:column;align-items:center}
 
     /* 捨て牌グリッド（各席の目前） */
-    .discard{display:grid;gap:4px}
-    .seat.top .discard, .seat.bottom .discard{grid-template-columns:repeat(6,36px);justify-content:center}
+    .discard{display:grid;gap:iscard, .seat.bottom .discard{grid-template-columns:repeat(6,36px);justify-content:center}
     .seat.left .discard, .seat.right .discard{grid-template-columns:repeat(3,36px)}
 
-    /* 壁（中央プレビュー） */
-    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:
-    .wall-preview{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:220px}
+    /* 山（各席の目前） */
+    .wall-side{display:grid;gap:2px;opacity:.95}
+    .wal.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:1}
+    .machine{width:200px;height:160px;background:radial
+    .brick{width:32px;height:22px;border-radius:3px;background:linear-gradient(180deg,#2b3940,#0f1724);box-shadow:0 2px 6px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06)}
+
+    /* 中央：雀卓の機械（飾り） */
+    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:1}
+    .machine{width:220px;height:170px;background:radial-gradient(circle at 50% 30%, #133a2a 0%, #0a2c1f 60%, #072219 100%);border:2px solid rgba(255,255,255,.08);border-radius:12px;box-shadow:inset 0 6px 18px rgba(0,0,0,.6),0 8px 22px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .machine .wind{color:#e6f8ea;font-weight:800;letter-spacing:.2em}
+    .machine .dice{margin-top:6px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
 
     /* 牌（CSSで麻雀牌風） */
     .tile{position:relative;width:52px;height:74px;border-radius:6px;background:linear-gradient(180deg,var(--tile-front),#f3f4f6);border:1px solid var(--tile-border);box-shadow:0 6px 12px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;user-select:none}
-    /* 側面（右側に黄土色のエッジ） */
     .tile::before{content:"";position:absolute;top:-1px;bottom:-1px;right:-6px;width:6px;background:linear-gradient(180deg,var(--tile-side),#e8c379);border-left:1px solid var(--tile-edge);border-radius:0 6px 6px 0;transform:skewY(-4deg)}
     .tile.small{width:36px;height:52px;border-radius:4px}
     .tile.back{background:linear-gradient(180deg,#2b3940,#0f1724);color:#9ca3af;border:1px solid rgba(255,255,255,0.06)}
     .tile.back::before{background:linear-gradient(180deg,#1d2630,#0b1220);border-left:1px solid rgba(255,255,255,0.05)}
 
     /* 牌の文字面 */
-    .face{display:flex;flex-direction:column;align-items:center;line-height:1}
-    .idx{font-size:12px;opacity:.85;margin-bottom:2px}
-    .pip{font-size:18px;font-weight:800}
-    .m .pip,.m .idx{color:var(--man)}
-    .p .pip,.p .idx{color:var(--pin)}
-    .s .pip,.s .idx{color:var(--sou)}
-    .aka .pip{color:#ef4444}
-
-    @media (max-width:900px){
-      .table{height:760px}
-      .tile{width:44px;height:64px}
-      .tile.small{width:30px;height:44px}
-    }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>見下ろし麻雀デモ（自動配牌・各席前に捨て牌・CSS牌）</h1>
-    <div class="table" id="table">
-      <div class="hud">
-        <div class="info">ターン: <span id="turnLabel">-</span></div>
-        <button class="btn" id="resetBtn" title="リセットして再配牌">リセット</button>
-      </div>
-
-      <!-- 対面（上） -->
-      <div class="seat top" id="seatTop">
+    .face{display:flex;flex-direction:column;align-items:center;line-heig<div class="seat top" id="seatTop">
         <div class="name">対面（上）</div>
         <div class="hand" id="handTop"></div>
         <div class="wall-side horiz" id="wallTop"></div>
@@ -126,9 +105,36 @@
         <div class="machine">
           <div class="wind">東 1局</div>
           <div class="dice">⚀⚄</div>
+        </div>iv class="seat left" id="seatLeft">
+        <div class="hand" id="handLeft"></div>
+        <div class="wall-side vert" id="wallLeft"></div>
+        <div class="discard" id="discardLeft"></div>
+        <div class="name" style="writing-mode:vertical-rl;">左（かみちゃ）</div>
+      </div>
+
+      <!-- 右（しもちゃ）: 手牌→山→捨て牌（中央側=左） -->
+      <div class="seat right" id="seatRight">
+        <div class="hand" id="handRight"></div>
+        <div class="wall-side vert" id="wallRight"></div>
+        <div class="discard" id="discardRight"></div>
+        <div class="name" style="writing-mode:vertical-rl;">右（しもちゃ）</div>
+      </div>
+
+      <!-- 下（あなた）: 手牌→山→捨て牌（中央） -->
+      <div class="seat bottom" id="seatBottom">
+        <div class="hand" id="handBottom"></div>
+        <div class="wall-side horiz" id="wallBottom"></div>
+        <div class="discard" id="discardBottom"></div>
+        <div class="name">あなた</div>
+      </div>
+
+      <!-- 中央：雀卓の機械（飾り） -->
+      <div class="center">
+        <div class="machine">
+          <div class="wind">東 1 局</div>
+          <div class="dice">⚀ ⚄</div>
         </div>
-        <div class="wall-preview" id="wallPreview"></div>
-        <div class="info">山（左が先頭） • CPUはツモ切りで自動進行／ページ読み込みで自動配牌</div>
+        <div class="info">CPUはツモ切り／ページ読み込みで自動配牌</div>
       </div>
 
       <div class="log" id="log">ロード中…自動で配牌します。</div>
@@ -148,12 +154,11 @@
       return tiles;
     }
     function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a; }
-    function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
     // ===== ゲーム状態 =====
-    let wall=[];
-    const hands=[[],[],[],[]]; // 0:上,1:左,2:右,3:下(あなた)
-    const discards=[[],[],[],[]];
+    let wall=[];                 // 実際に引く山（共有）
+    let wallSide=[27,27,27,27];  // 見た目用の各席の山の残枚数（108枚÷4）
+    const hands=[[],[],[],[]];   // 0:上,1:左,2:右,3:下(あな discards=[[],[],[],[]];
     let turn=3; // あなたから開始
 
     // 要素参照
@@ -169,7 +174,11 @@
       document.getElementById('discardRight'),
       document.getElementById('discardBottom')
     ];
-    const wallPreview=document.getElementById('wallPreview');
+    const elWall=[
+      document.getElementById('wallTop'),
+      doentById('wallRight'),
+      document.getElementById('wallBottom')
+    ];
     const turnLabel=document.getElementById('turnLabel');
     const logEl=document.getElementById('log');
 
@@ -212,40 +221,25 @@
         const el=elDiscard[p]; el.innerHTML='';
         discards[p].forEach(t=> el.appendChild(createTileEl(t,true)) );
       }
-      // 壁プレビュー
-      wallPreview.innerHTML='';
-      wall.slice(0,18).forEach(()=>{ const back=document.createElement('div'); back.className='tile small back'; wallPreview.appendChild(back); });
-      turnLabel.textContent=['対面','左','右','あなた'][turn];
-    }
-
-    // ===== 配牌と進行 =====
-    function deal(){
-      const base=shuffle(makeTiles()); wall=base.slice();
+      // 各席の山（残枚数に応じてブロック表示）
+      for(let p=0;p<4;p++){
+        const w=elWall[p]; w.innerHTML='';
+        const cnt=Math.max(0, Math.min(34, wallSide[p]));
+        for(let i=0;i<cnt;i++){
+          const b=document.creashuffle(makeTiles()); wall=base.slice();
+      wallSide=[27,27,27,27];
       for(let p=0;p<4;p++){ hands[p]=[]; discards[p]=[]; }
-      // 13枚
+      // 13枚（3回×4枚配り＋1枚）
       for(let r=0;r<3;r++){
         for(let p=0;p<4;p++){
-          for(let k=0;k<4;k++) hands[p].push(wall.shift());
+          for(let k=0;k<4;k++){ hands[p].push(wall.shift()); if(wallSide[p]>0) wallSide[p]--; }
         }
       }
-      for(let p=0;p<4;p++) hands[p].push(wall.shift());
+      for(let p=0;p<4;p++){ hands[p].push(wall.shift()); if(wallSide[p]>0) wallSide[p]--; }
       // あなたを親で14枚
-      hands[3].push(wall.shift());
-      turn=3; render(); log('配牌完了。あなたの番です。牌をクリックして捨ててください。');
-    }
-
-    function discard(playerIndex,tileIndex){
-      if(playerIndex!==3) return;
-      if(tileIndex<0||tileIndex>=hands[3].length) return;
-      const t=hands[3].splice(tileIndex,1)[0];
-      discards[3].push(t);
-      render(); log('あなたが捨てた: '+formatTile(t));
-      nextTurn();
-    }
-
     function cpuAct(p){
       if(wall.length===0) return;
-      const t=wall.shift(); hands[p].push(t);
+      const t=wall.shift(); if(wallSide[p]>0) wallSide[p]--; hands[p].push(t);
       const d=hands[p].pop(); discards[p].push(d);
       render(); log(['対面','左','右'][p]+' (CPU) ツモ切り: '+formatTile(d));
     }
