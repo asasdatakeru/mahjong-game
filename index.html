@@ -3,119 +3,123 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>麻雀デモ（4人対戦・簡易版）</title>
+  <title>見下ろし麻雀デモ（自動配牌・縦配置対応）</title>
   <style>
-    :root{--bg:#0b4f2a;--felt:#0b5d37;--tile:#fff;--muted:#d1e7d6}
-    html,body{height:100%;margin:0;font-family:Inter, system-ui, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;background:linear-gradient(180deg,#072a18 0%,#062216 100%);color:var(--muted)}
-    .app{max-width:1100px;margin:18px auto;padding:18px;border-radius:12px}
-    h1{margin:0 0 8px;font-size:18px;color:#f8fafc}
-    .table{background:linear-gradient(180deg,var(--felt),#0a3f29);padding:18px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.7)}
+    :root{
+      --table:#0b5d37;
+      --bg:#0b2f1e;
+      --tile-bg:#fff;
+      --tile-border:#d1d5db;
+      --muted:#cfead0;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;background:linear-gradient(180deg,var(--bg),#062216);color:var(--muted)}
+    .wrap{max-width:1200px;margin:18px auto;padding:12px}
+    h1{margin:0 0 10px;color:#f8fafc;font-size:18px}
+    .table{background:var(--table);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,0.6);position:relative;height:620px;overflow:hidden}
+    .hud{position:absolute;right:14px;top:14px;display:flex;gap:8px;align-items:center}
+    .btn{background:#115e43;color:#eafaf0;padding:8px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
+    .seat{position:absolute;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:auto}
+    .seat .name{font-weight:700;color:#e6f8ea;font-size:13px}
+    .seat.top{top:12px;left:50%;transform:translateX(-50%)} /* 対面 */
+    .seat.left{left:12px;top:50%;transform:translateY(-50%)} /* 右手（画面左） */
+    .seat.right{right:12px;top:50%;transform:translateY(-50%)} /* 左手（画面右） */
+    .seat.bottom{bottom:12px;left:50%;transform:translateX(-50%)} /* 自分（下） */
 
-    .top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    .controls{display:flex;gap:8px}
-    button{background:#f97316;border:0;padding:8px 12px;border-radius:8px;color:white;cursor:pointer;font-weight:700}
-    button.secondary{background:#334155}
-
-    .board{position:relative;height:520px}
-
-    /* 座席レイアウト */
-    .seat{position:absolute;display:flex;flex-direction:column;align-items:center;gap:8px}
-    .seat.top{top:12px;left:50%;transform:translateX(-50%)}
-    .seat.left{left:12px;top:50%;transform:translateY(-50%)}
-    .seat.right{right:12px;top:50%;transform:translateY(-50%)}
-    .seat.bottom{bottom:12px;left:50%;transform:translateX(-50%)}
-
-    .name{font-size:13px;color:#e6f8ea;font-weight:700}
+    /* 手牌のレイアウト
+       - bottom / top: 横並び
+       - left / right: 縦並び（ユーザー要望） */
     .hand{display:flex;gap:6px;align-items:flex-end}
+    .seat.left .hand{flex-direction:column-reverse;align-items:center}   /* 縦（下が最新） */
+    .seat.right .hand{flex-direction:column;align-items:center}         /* 縦（上が最新） */
+    .seat.top .hand{flex-direction:row}
+    .seat.bottom .hand{flex-direction:row}
 
     /* 牌 */
-    .tile{width:50px;height:74px;background:linear-gradient(180deg,#fff,#f3f4f6);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#062218;box-shadow:0 6px 12px rgba(0,0,0,0.35);cursor:pointer}
-    .tile.small{width:36px;height:52px;font-size:13px}
-    .tile.back{background:linear-gradient(180deg,#1f2937,#111827);color:#9ca3af}
-    .tile.dim{opacity:0.55}
+    .tile{
+      width:52px;height:74px;background:var(--tile-bg);border-radius:6px;border:1px solid var(--tile-border);
+      display:flex;align-items:center;justify-content:center;font-weight:800;color:#062218;
+      box-shadow:0 6px 12px rgba(0,0,0,0.35);cursor:pointer;user-select:none;font-size:16px;
+    }
+    .tile.small{width:36px;height:52px;font-size:12px;border-radius:4px}
+    .tile.back{background:linear-gradient(180deg,#2b3940,#0f1724);color:#9ca3af;border:1px solid rgba(255,255,255,0.03)}
+    .tile.dim{opacity:0.6}
 
+    /* 中央の捨て牌列と山 */
     .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px}
-    .wall{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
-    .wall .tile{width:34px;height:46px;border-radius:4px}
+    .wall-preview{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:220px}
+    .discard-pool{display:flex;flex-wrap:wrap;gap:6px;max-width:420px;justify-content:center}
 
-    .discard-area{display:flex;gap:6px;flex-wrap:wrap;max-width:220px}
+    /* 捨て牌の各相手用エリア（中央に配置）*/
+    .disc-section{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:640px}
+
     .info{font-size:13px;color:#cfead0}
-    .log{margin-top:10px;color:#c8e7c9;min-height:22px}
+    .log{position:absolute;left:14px;bottom:14px;color:#cbe7c8;font-size:13px;min-width:300px}
 
-    .hud{position:absolute;right:14px;bottom:14px;background:rgba(255,255,255,0.04);padding:10px;border-radius:8px;color:#d3f0d5}
-    .badge{background:#155e43;padding:6px 8px;border-radius:8px;color:#e2fbe9;font-weight:700}
-
-    @media(max-width:900px){
-      .tile{width:40px;height:60px}
-      .tile.small{width:30px;height:44px}
-      .wall .tile{width:28px;height:38px}
-      .board{height:620px}
+    @media (max-width:900px){
+      .table{height:760px}
+      .tile{width:40px;height:56px}
+      .tile.small{width:28px;height:44px}
+      .disc-section{width:320px}
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <h1>麻雀デモ（4人対戦・簡易）</h1>
-    <div class="table">
-      <div class="top-row">
-        <div class="controls">
-          <button id="dealBtn">配牌（4人）</button>
-          <button id="drawBtn" class="secondary">ツモ（あなた）</button>
-          <button id="nextBtn" class="secondary">次へ（ターン進める）</button>
-          <button id="autoRound">自動ラウンド（CPU動作）</button>
-          <button id="resetBtn" class="secondary">リセット</button>
-        </div>
-        <div class="badge">簡易対戦</div>
+  <div class="wrap">
+    <h1>見下ろし麻雀デモ（自動配牌・縦配置対応）</h1>
+    <div class="table" id="table">
+      <div class="hud">
+        <div class="info">ターン: <span id="turnLabel">-</span></div>
+        <button class="btn" id="resetBtn" title="リセットして再配牌">リセット</button>
       </div>
 
-      <div class="board" id="board">
-        <!-- 上家 -->
-        <div class="seat top" id="seat0">
-          <div class="name">東 - CPU A</div>
-          <div class="hand" id="hand0"></div>
-          <div class="discard-area" id="discard0"></div>
-        </div>
-
-        <!-- 左家 -->
-        <div class="seat left" id="seat1">
-          <div class="name">南 - CPU B</div>
-          <div class="hand" id="hand1"></div>
-          <div class="discard-area" id="discard1"></div>
-        </div>
-
-        <!-- 右家 -->
-        <div class="seat right" id="seat2">
-          <div class="name">西 - CPU C</div>
-          <div class="hand" id="hand2"></div>
-          <div class="discard-area" id="discard2"></div>
-        </div>
-
-        <!-- 下家（あなた） -->
-        <div class="seat bottom" id="seat3">
-          <div class="name">あなた</div>
-          <div class="hand" id="hand3"></div>
-          <div class="discard-area" id="discard3"></div>
-        </div>
-
-        <div class="center">
-          <div class="wall" id="wallPreview"></div>
-          <div class="info">山（左が先頭） • クリックで自分の牌を捨ててください（あなたのみ）</div>
-        </div>
-
-        <div class="hud" id="hud">
-          <div class="info">ターン: <span id="turnLabel">-</span></div>
-          <div class="info">山残り: <span id="wallCount">0</span></div>
-        </div>
+      <!-- 対面（上） -->
+      <div class="seat top" id="seatTop">
+        <div class="name">対面（上）</div>
+        <div class="hand" id="handTop"></div>
+        <div class="discard-area" id="discardTop"></div>
       </div>
 
-      <div class="log" id="log">準備完了。配牌を押してください。</div>
+      <!-- 左（かみちゃ） -->
+      <div class="seat left" id="seatLeft">
+        <div class="name">左（かみちゃ）</div>
+        <div class="hand" id="handLeft"></div>
+        <div class="discard-area" id="discardLeft"></div>
+      </div>
+
+      <!-- 右（しもちゃ） -->
+      <div class="seat right" id="seatRight">
+        <div class="name">右（しもちゃ）</div>
+        <div class="hand" id="handRight"></div>
+        <div class="discard-area" id="discardRight"></div>
+      </div>
+
+      <!-- 自分（下） -->
+      <div class="seat bottom" id="seatBottom">
+        <div class="name">あなた</div>
+        <div class="hand" id="handBottom"></div>
+        <div class="discard-area" id="discardBottom"></div>
+      </div>
+
+      <!-- 中央：山と捨て牌 -->
+      <div class="center">
+        <div class="wall-preview" id="wallPreview"></div>
+        <div class="disc-section">
+          <div class="discard-pool" id="pool0"></div>
+          <div class="discard-pool" id="pool1"></div>
+          <div class="discard-pool" id="pool2"></div>
+          <div class="discard-pool" id="pool3"></div>
+        </div>
+        <div class="info">山（左が先頭） • CPUはツモ切りで自動進行</div>
+      </div>
+
+      <div class="log" id="log">ロード中…自動で配牌します。</div>
     </div>
   </div>
 
   <script>
-    // 牌生成（簡易：1-9の3スート、4枚ずつ）
+    // --- データとユーティリティ ---
     function makeTiles(){
-      const suits=['m','p','s'];
+      const suits=['m','p','s']; // 萬子/筒子/索子
       const tiles=[];
       for(const s of suits){
         for(let n=1;n<=9;n++){
@@ -124,153 +128,177 @@
       }
       return tiles;
     }
-    function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a; }
+    function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-    // ゲーム状態
+    // --- ゲーム状態 ---
     let wall=[];
-    const hands=[[],[],[],[]]; // 0..2 CPU, 3 is player
+    const hands=[[],[],[],[]]; // 0: top, 1: left, 2: right, 3: bottom(あなた)
     const discards=[[],[],[],[]];
-    let turn=3; // 最初はプレイヤーのターン（例）
+    let turn = 3; // 0..3, start with player (bottom)
+    // elements
+    const elHand = [document.getElementById('handTop'), document.getElementById('handLeft'), document.getElementById('handRight'), document.getElementById('handBottom')];
+    const elPool = [document.getElementById('pool0'), document.getElementById('pool1'), document.getElementById('pool2'), document.getElementById('pool3')];
+    const wallPreview = document.getElementById('wallPreview');
+    const turnLabel = document.getElementById('turnLabel');
+    const logEl = document.getElementById('log');
+    const resetBtn = document.getElementById('resetBtn');
 
-    const handEls=[document.getElementById('hand0'),document.getElementById('hand1'),document.getElementById('hand2'),document.getElementById('hand3')];
-    const discardEls=[document.getElementById('discard0'),document.getElementById('discard1'),document.getElementById('discard2'),document.getElementById('discard3')];
-    const wallEl=document.getElementById('wallPreview');
-    const logEl=document.getElementById('log');
-    const turnLabel=document.getElementById('turnLabel');
-    const wallCount=document.getElementById('wallCount');
+    function log(msg){ logEl.textContent = msg; }
 
-    function renderAll(){
+    // --- レンダリング ---
+    function render(){
       // hands
       for(let p=0;p<4;p++){
-        const el=handEls[p];el.innerHTML='';
-        // CPUは裏向きの表示（小さい枚数）
-        if(p!==3){
-          // 表示は背の牌を並べる
-          for(let i=0;i<hands[p].length;i++){
-            const d=document.createElement('div');d.className='tile small back dim';d.textContent='🀫';d.title='';el.appendChild(d);
-          }
-        } else {
-          // プレイヤーは牌をクリックで捨てられる
+        const el = elHand[p];
+        el.innerHTML = '';
+        if(p === 3){
+          // プレイヤーは表で横並び
           hands[3].forEach((t,i)=>{
-            const d=document.createElement('div');d.className='tile';d.textContent=t;d.title='クリックで捨てる';
-            d.onclick=()=>{ // 捨てる
-              discard(3,i);
-            };
+            const d = document.createElement('div');
+            d.className = 'tile';
+            d.textContent = formatTile(t);
+            d.title = 'クリックで捨てる';
+            d.onclick = ()=> { if(turn !== 3) return; discard(3,i); };
             el.appendChild(d);
           });
+        } else {
+          // CPUは背面小牌を縦/横で並べる（見下ろし風）
+          const count = hands[p].length;
+          for(let i=0;i<count;i++){
+            const d = document.createElement('div');
+            d.className = 'tile small back';
+            d.textContent = '🀫';
+            el.appendChild(d);
+          }
         }
       }
-      // discards
+
+      // discards pools (中央の各席用スペース)
       for(let p=0;p<4;p++){
-        const el=discardEls[p];el.innerHTML='';
-        discards[p].forEach(t=>{const d=document.createElement('div');d.className='tile small';d.textContent=t;el.appendChild(d)});
+        const el = elPool[p]; el.innerHTML = '';
+        discards[p].forEach(t=>{
+          const d = document.createElement('div');
+          d.className = 'tile small';
+          d.textContent = formatTile(t);
+          el.appendChild(d);
+        });
       }
-      // wall preview
-      wallEl.innerHTML='';
-      const preview=wall.slice(0,18);
-      preview.forEach(t=>{const d=document.createElement('div');d.className='tile small back';d.textContent='🀫';wallEl.appendChild(d)});
-      wallCount.textContent=wall.length;
-      turnLabel.textContent=['東','南','西','あなた'][turn];
+
+      // wall preview (背面)
+      wallPreview.innerHTML = '';
+      const preview = wall.slice(0,20);
+      preview.forEach(_t=>{
+        const d = document.createElement('div');
+        d.className = 'tile small back';
+        d.textContent = '🀫';
+        wallPreview.appendChild(d);
+      });
+
+      turnLabel.textContent = ['対面','左','右','あなた'][turn];
     }
 
-    function log(msg){logEl.textContent=msg}
+    // 表示用タイル文字（CSS牌に入れるテキスト）
+    function formatTile(t){
+      // t like '1m' '5p' '9s'
+      if(!t) return '';
+      const v = t.slice(0,-1), s = t.slice(-1);
+      const suitMap = { m: '萬', p: '筒', s: '索' };
+      // 1m -> '1萬' 、 honor not included in this simple set
+      return v + suitMap[s];
+    }
 
-    // 配牌：各13枚、プレイヤーは14枚（親想定）
+    // --- 配牌と基本動作 ---
     function deal(){
-      const base=shuffle(makeTiles());
-      wall=base.slice();
-      for(let p=0;p<4;p++){hands[p]=[];discards[p]=[]}
-      // 13枚配る
+      const base = shuffle(makeTiles());
+      wall = base.slice();
+      // clear
+      for(let p=0;p<4;p++){ hands[p]=[]; discards[p]=[]; }
+      // 各人13枚を配る（効率的に）
       for(let r=0;r<3;r++){
         for(let p=0;p<4;p++){
-          for(let k=0;k<4;k++){hands[p].push(wall.shift())}
+          for(let k=0;k<4;k++) hands[p].push(wall.shift());
         }
       }
-      // さらに1枚ずつ（合計13）
-      for(let p=0;p<4;p++) hands[p].push(wall.shift());
-      // プレイヤーは親で14枚にする
+      for(let p=0;p<4;p++) hands[p].push(wall.shift()); // 13枚に
+      // プレイヤー（下）は親として14枚
       hands[3].push(wall.shift());
-      turn=3; // プレイヤーから開始
-      renderAll();log('配牌完了。あなたの番です。ツモか捨てをしてください。');
+      turn = 3; // プレイヤーから
+      render();
+      log('配牌完了。あなたの番です。牌をクリックして捨ててください。');
     }
 
-    // ツモ（プレイヤー用）
     function drawForPlayer(){
-      if(wall.length===0){log('山がないよ');return}
-      const t=wall.shift();hands[3].push(t);renderAll();log('あなたはツモ: '+t+'');
+      if(wall.length === 0){ log('山がありません'); return; }
+      const t = wall.shift(); hands[3].push(t); render(); log('ツモ: ' + formatTile(t));
     }
 
-    // 捨てる
-    function discard(playerIndex,tileIndex){
-      if(playerIndex!==3){return}
-      // プレイヤーだけ手動で捨てられる
-      const tile=hands[3].splice(tileIndex,1)[0];
-      discards[3].push(tile);
-      renderAll();
-      log('あなたが捨てた: '+tile);
-      // 捨てたらターン進行（CPU順に）
+    function discard(playerIndex, tileIndex){
+      if(playerIndex !== 3) return; // プレイヤーのみ手動
+      if(tileIndex < 0 || tileIndex >= hands[3].length) return;
+      const t = hands[3].splice(tileIndex,1)[0];
+      discards[3].push(t);
+      render();
+      log('あなたが捨てた: ' + formatTile(t));
+      // ターン進行
       nextTurn();
     }
 
-    // CPUのシンプルな動作：ツモしてすぐ切る（ツモ切り）
     function cpuAct(p){
-      if(wall.length===0){log('山がない（CPU）');return}
-      const t=wall.shift();
+      if(wall.length === 0) return;
+      // ツモ（push）→即ツモ切り（pop）
+      const t = wall.shift();
       hands[p].push(t);
-      // ツモ切り：引いた牌をすぐ捨てる
-      const discarded=hands[p].pop();
+      const discarded = hands[p].pop(); // ツモ切り
       discards[p].push(discarded);
-      renderAll();
-      log(['東','南','西'][p]+"(CPU) がツモ切り: "+discarded);
+      render();
+      log(['対面','左','右'][p] + ' (CPU) ツモ切り: ' + formatTile(discarded));
     }
 
     function nextTurn(){
-      // advance turn clockwise: 3 -> 0 -> 1 -> 2 -> 3 ...
-      turn = (turn+1) % 4;
-      renderAll();
-      // if it's CPU's turn, let them act automatically after short delay
+      turn = (turn + 1) % 4;
+      render();
       if(turn !== 3){
+        // CPU が動く
         setTimeout(()=>{
           cpuAct(turn);
-          // after CPU acted, move to next
+          // CPU が捨てた後、ターンを進める（次もCPUならループ）
           nextTurn();
-        }, 450);
+        }, 380);
       } else {
         log('あなたの番です。ツモするか、手牌をクリックして捨ててください。');
       }
     }
 
-    // 自動ラウンド：プレイヤー以外は自動でツモ切りを続ける。プレイヤーは自動的にツモ＋ツモ切り（見栄え用）
-    async function autoRound(){
-      if(wall.length===0) deal();
-      const steps=24; // 適当な手動サイクル数
+    // 自動ラウンド（表示用） - 画面で動きを見せたい時に使える
+    async function autoRound(steps = 24){
       for(let i=0;i<steps;i++){
         await wait(320);
-        // current turn acts
-        if(turn===3){
-          // 自動のプレイヤー動作: ツモして直後に一番右を自動で切る
-          if(wall.length>0){const t=wall.shift();hands[3].push(t);renderAll();log('自動: あなたツモ '+t);}
-          await wait(220);
-          if(hands[3].length>0){const discarded=hands[3].pop();discards[3].push(discarded);renderAll();log('自動: あなた捨て '+discarded)}
-          turn=(turn+1)%4;
+        if(turn === 3){
+          if(wall.length > 0){ const t = wall.shift(); hands[3].push(t); render(); log('自動: あなたツモ ' + formatTile(t)); }
+          await wait(200);
+          if(hands[3].length > 0){ const d = hands[3].pop(); discards[3].push(d); render(); log('自動: あなた捨て ' + formatTile(d)); }
+          turn = (turn + 1) % 4;
         } else {
-          if(wall.length>0){const t=wall.shift();hands[turn].push(t);const discarded=hands[turn].pop();discards[turn].push(discarded);renderAll();log(['東','南','西'][turn]+"(CPU) 自動ツモ切り: "+discarded)}
-          turn=(turn+1)%4;
+          if(wall.length > 0){ const t = wall.shift(); hands[turn].push(t); const d = hands[turn].pop(); discards[turn].push(d); render(); log(['対面','左','右'][turn] + ' 自動ツモ切り: ' + formatTile(d)); }
+          turn = (turn + 1) % 4;
         }
       }
-      log('自動ラウンド終了（表示用）。');
+      log('自動ラウンド終了');
     }
 
-    function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+    // --- 初期化とイベント ---
+    resetBtn.addEventListener('click', ()=>{ deal(); });
 
-    document.getElementById('dealBtn').addEventListener('click',deal);
-    document.getElementById('drawBtn').addEventListener('click',drawForPlayer);
-    document.getElementById('nextBtn').addEventListener('click',()=>{nextTurn()});
-    document.getElementById('resetBtn').addEventListener('click',()=>{wall=[];for(let p=0;p<4;p++){hands[p]=[];discards[p]=[]}renderAll();log('リセットしました');});
-    document.getElementById('autoRound').addEventListener('click',()=>{autoRound()});
+    // 自動で配牌して開始（ページロード時）
+    window.addEventListener('load', ()=>{
+      // small delay for UX
+      setTimeout(()=>{ deal(); }, 180);
+    });
 
-    // 初期表示
-    wall=shuffle(makeTiles());renderAll();
+    // 初期wallを作って描画（空状態）
+    wall = shuffle(makeTiles());
+    render();
   </script>
 </body>
 </html>
