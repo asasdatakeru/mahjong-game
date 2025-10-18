@@ -3,68 +3,117 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>簡易麻雀デモ</title>
+  <title>麻雀デモ（4人対戦・簡易版）</title>
   <style>
-    :root{--bg:#0f1724;--card:#fff;--muted:#cbd5e1}
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo, sans-serif;background:linear-gradient(180deg,#071226 0%,var(--bg) 100%);color:var(--muted)}
-    .app{max-width:980px;margin:28px auto;padding:20px;border-radius:12px}
-    h1{color:#f8fafc;font-size:20px;margin:0 0 8px}
-    p{margin:0 0 14px}
-    .board{background:rgba(255,255,255,0.03);padding:18px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
-    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-    button{background:#0ea5a9;border:0;padding:8px 12px;border-radius:8px;color:white;cursor:pointer;font-weight:600}
-    button.secondary{background:#475569}
-    .row{display:flex;gap:12px;align-items:center}
-    .wall{display:flex;gap:4px;align-items:center;padding:10px;flex-wrap:wrap}
-    .tile{width:48px;height:72px;background:linear-gradient(180deg,#ffffff,#f1f5f9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#0b1f2b;box-shadow:0 4px 10px rgba(2,6,23,0.2);cursor:pointer;transition:transform .22s}
-    .tile.small{width:36px;height:54px;font-size:13px}
-    .tiles-area{display:flex;gap:8px;align-items:flex-end;min-height:92px}
-    .player-hand{padding:12px;background:rgba(255,255,255,0.02);border-radius:8px}
-    .log{margin-top:12px;color:#94a3b8;min-height:30px}
-    .deal-anim{animation:deal .45s ease forwards}
-    @keyframes deal{from{transform:translateY(-40px) scale(.6);opacity:0}to{transform:none;opacity:1}}
-    .hint{font-size:12px;color:#94a3b8}
-    .footer{margin-top:12px;font-size:13px;color:#94a3b8}
-    .badge{background:#334155;padding:6px 8px;border-radius:8px;color:#e2e8f0;font-weight:700}
+    :root{--bg:#0b4f2a;--felt:#0b5d37;--tile:#fff;--muted:#d1e7d6}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;background:linear-gradient(180deg,#072a18 0%,#062216 100%);color:var(--muted)}
+    .app{max-width:1100px;margin:18px auto;padding:18px;border-radius:12px}
+    h1{margin:0 0 8px;font-size:18px;color:#f8fafc}
+    .table{background:linear-gradient(180deg,var(--felt),#0a3f29);padding:18px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.7)}
+
+    .top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .controls{display:flex;gap:8px}
+    button{background:#f97316;border:0;padding:8px 12px;border-radius:8px;color:white;cursor:pointer;font-weight:700}
+    button.secondary{background:#334155}
+
+    .board{position:relative;height:520px}
+
+    /* 座席レイアウト */
+    .seat{position:absolute;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .seat.top{top:12px;left:50%;transform:translateX(-50%)}
+    .seat.left{left:12px;top:50%;transform:translateY(-50%)}
+    .seat.right{right:12px;top:50%;transform:translateY(-50%)}
+    .seat.bottom{bottom:12px;left:50%;transform:translateX(-50%)}
+
+    .name{font-size:13px;color:#e6f8ea;font-weight:700}
+    .hand{display:flex;gap:6px;align-items:flex-end}
+
+    /* 牌 */
+    .tile{width:50px;height:74px;background:linear-gradient(180deg,#fff,#f3f4f6);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#062218;box-shadow:0 6px 12px rgba(0,0,0,0.35);cursor:pointer}
+    .tile.small{width:36px;height:52px;font-size:13px}
+    .tile.back{background:linear-gradient(180deg,#1f2937,#111827);color:#9ca3af}
+    .tile.dim{opacity:0.55}
+
+    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px}
+    .wall{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
+    .wall .tile{width:34px;height:46px;border-radius:4px}
+
+    .discard-area{display:flex;gap:6px;flex-wrap:wrap;max-width:220px}
+    .info{font-size:13px;color:#cfead0}
+    .log{margin-top:10px;color:#c8e7c9;min-height:22px}
+
+    .hud{position:absolute;right:14px;bottom:14px;background:rgba(255,255,255,0.04);padding:10px;border-radius:8px;color:#d3f0d5}
+    .badge{background:#155e43;padding:6px 8px;border-radius:8px;color:#e2fbe9;font-weight:700}
+
+    @media(max-width:900px){
+      .tile{width:40px;height:60px}
+      .tile.small{width:30px;height:44px}
+      .wall .tile{width:28px;height:38px}
+      .board{height:620px}
+    }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="board">
-      <h1>簡易麻雀デモ（GIF向け）</h1>
-      <p class="hint">透明なロジックで動くシンプルな1人向けデモ: 配牌→ツモ→捨てる を再生できます。GIFにすると操作アニメーションが映えます。</p>
-
-      <div class="controls">
-        <button id="dealBtn">配牌（最初の14枚）</button>
-        <button id="drawBtn" class="secondary">ツモ</button>
-        <button id="autoBtn">自動で数回ツモ（GIF用）</button>
-        <button id="resetBtn" class="secondary">リセット</button>
-        <div style="margin-left:auto" class="badge">簡易版</div>
+    <h1>麻雀デモ（4人対戦・簡易）</h1>
+    <div class="table">
+      <div class="top-row">
+        <div class="controls">
+          <button id="dealBtn">配牌（4人）</button>
+          <button id="drawBtn" class="secondary">ツモ（あなた）</button>
+          <button id="nextBtn" class="secondary">次へ（ターン進める）</button>
+          <button id="autoRound">自動ラウンド（CPU動作）</button>
+          <button id="resetBtn" class="secondary">リセット</button>
+        </div>
+        <div class="badge">簡易対戦</div>
       </div>
 
-      <div class="row">
-        <div style="flex:1">
-          <div class="player-hand" id="playerArea">
-            <div style="font-size:13px;color:#cbd5e1;margin-bottom:8px">プレイヤーの手札（クリックで捨てる）</div>
-            <div class="tiles-area" id="hand"></div>
-          </div>
-
-          <div class="log" id="log">準備完了 — 「配牌」を押してください。</div>
+      <div class="board" id="board">
+        <!-- 上家 -->
+        <div class="seat top" id="seat0">
+          <div class="name">東 - CPU A</div>
+          <div class="hand" id="hand0"></div>
+          <div class="discard-area" id="discard0"></div>
         </div>
 
-        <div style="width:220px;margin-left:12px">
-          <div style="font-size:13px;color:#cbd5e1;margin-bottom:8px">山（残り）</div>
+        <!-- 左家 -->
+        <div class="seat left" id="seat1">
+          <div class="name">南 - CPU B</div>
+          <div class="hand" id="hand1"></div>
+          <div class="discard-area" id="discard1"></div>
+        </div>
+
+        <!-- 右家 -->
+        <div class="seat right" id="seat2">
+          <div class="name">西 - CPU C</div>
+          <div class="hand" id="hand2"></div>
+          <div class="discard-area" id="discard2"></div>
+        </div>
+
+        <!-- 下家（あなた） -->
+        <div class="seat bottom" id="seat3">
+          <div class="name">あなた</div>
+          <div class="hand" id="hand3"></div>
+          <div class="discard-area" id="discard3"></div>
+        </div>
+
+        <div class="center">
           <div class="wall" id="wallPreview"></div>
-          <div style="font-size:12px;margin-top:8px;color:#94a3b8">ツモすると上から1枚取ります。GIF用途なら「自動で数回ツモ」を押すと動きます。</div>
+          <div class="info">山（左が先頭） • クリックで自分の牌を捨ててください（あなたのみ）</div>
+        </div>
+
+        <div class="hud" id="hud">
+          <div class="info">ターン: <span id="turnLabel">-</span></div>
+          <div class="info">山残り: <span id="wallCount">0</span></div>
         </div>
       </div>
 
-      <div class="footer">出力形式: テキストタイル（1m〜9m,1p〜9p,1s〜9s） • エフェクト: 配牌アニメ</div>
+      <div class="log" id="log">準備完了。配牌を押してください。</div>
     </div>
   </div>
 
   <script>
-    // 簡易タイルセット: 1-9 の 3 スーツを 4枚ずつ（計108枚）。ドラなどは無視。
+    // 牌生成（簡易：1-9の3スート、4枚ずつ）
     function makeTiles(){
       const suits=['m','p','s'];
       const tiles=[];
@@ -75,83 +124,153 @@
       }
       return tiles;
     }
+    function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 
-    function shuffle(a){
-      for(let i=a.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];
-      }
-      return a;
-    }
+    // ゲーム状態
+    let wall=[];
+    const hands=[[],[],[],[]]; // 0..2 CPU, 3 is player
+    const discards=[[],[],[],[]];
+    let turn=3; // 最初はプレイヤーのターン（例）
 
-    let wall=[];let playerHand=[];
-    const handEl=document.getElementById('hand');
+    const handEls=[document.getElementById('hand0'),document.getElementById('hand1'),document.getElementById('hand2'),document.getElementById('hand3')];
+    const discardEls=[document.getElementById('discard0'),document.getElementById('discard1'),document.getElementById('discard2'),document.getElementById('discard3')];
     const wallEl=document.getElementById('wallPreview');
     const logEl=document.getElementById('log');
+    const turnLabel=document.getElementById('turnLabel');
+    const wallCount=document.getElementById('wallCount');
 
-    function renderHand(){
-      handEl.innerHTML='';
-      playerHand.forEach((t,i)=>{
-        const d=document.createElement('div');d.className='tile deal-anim';d.textContent=t;d.title='クリックで捨てる';
-        d.onclick=()=>{discard(i)};
-        handEl.appendChild(d);
-      });
-    }
-
-    function renderWall(){
+    function renderAll(){
+      // hands
+      for(let p=0;p<4;p++){
+        const el=handEls[p];el.innerHTML='';
+        // CPUは裏向きの表示（小さい枚数）
+        if(p!==3){
+          // 表示は背の牌を並べる
+          for(let i=0;i<hands[p].length;i++){
+            const d=document.createElement('div');d.className='tile small back dim';d.textContent='🀫';d.title='';el.appendChild(d);
+          }
+        } else {
+          // プレイヤーは牌をクリックで捨てられる
+          hands[3].forEach((t,i)=>{
+            const d=document.createElement('div');d.className='tile';d.textContent=t;d.title='クリックで捨てる';
+            d.onclick=()=>{ // 捨てる
+              discard(3,i);
+            };
+            el.appendChild(d);
+          });
+        }
+      }
+      // discards
+      for(let p=0;p<4;p++){
+        const el=discardEls[p];el.innerHTML='';
+        discards[p].forEach(t=>{const d=document.createElement('div');d.className='tile small';d.textContent=t;el.appendChild(d)});
+      }
+      // wall preview
       wallEl.innerHTML='';
-      // show up to 15 small tiles
-      const preview=wall.slice(0,15);
-      preview.forEach(t=>{const d=document.createElement('div');d.className='tile small';d.textContent=t;wallEl.appendChild(d)});
+      const preview=wall.slice(0,18);
+      preview.forEach(t=>{const d=document.createElement('div');d.className='tile small back';d.textContent='🀫';wallEl.appendChild(d)});
+      wallCount.textContent=wall.length;
+      turnLabel.textContent=['東','南','西','あなた'][turn];
     }
 
     function log(msg){logEl.textContent=msg}
 
+    // 配牌：各13枚、プレイヤーは14枚（親想定）
     function deal(){
-      const base=makeTiles();shuffle(base);
+      const base=shuffle(makeTiles());
       wall=base.slice();
-      playerHand=[];
-      // 配牌: 13枚、親のとき14枚でもいいがここは14枚にして動きが分かりやすい
-      for(let i=0;i<14;i++){
-        playerHand.push(wall.shift());
+      for(let p=0;p<4;p++){hands[p]=[];discards[p]=[]}
+      // 13枚配る
+      for(let r=0;r<3;r++){
+        for(let p=0;p<4;p++){
+          for(let k=0;k<4;k++){hands[p].push(wall.shift())}
+        }
       }
-      renderHand();renderWall();log('配牌しました — 14枚（最初の1枚はツモ済み想定）');
+      // さらに1枚ずつ（合計13）
+      for(let p=0;p<4;p++) hands[p].push(wall.shift());
+      // プレイヤーは親で14枚にする
+      hands[3].push(wall.shift());
+      turn=3; // プレイヤーから開始
+      renderAll();log('配牌完了。あなたの番です。ツモか捨てをしてください。');
     }
 
-    function draw(){
-      if(wall.length===0){log('山がありません');return}
+    // ツモ（プレイヤー用）
+    function drawForPlayer(){
+      if(wall.length===0){log('山がないよ');return}
+      const t=wall.shift();hands[3].push(t);renderAll();log('あなたはツモ: '+t+'');
+    }
+
+    // 捨てる
+    function discard(playerIndex,tileIndex){
+      if(playerIndex!==3){return}
+      // プレイヤーだけ手動で捨てられる
+      const tile=hands[3].splice(tileIndex,1)[0];
+      discards[3].push(tile);
+      renderAll();
+      log('あなたが捨てた: '+tile);
+      // 捨てたらターン進行（CPU順に）
+      nextTurn();
+    }
+
+    // CPUのシンプルな動作：ツモしてすぐ切る（ツモ切り）
+    function cpuAct(p){
+      if(wall.length===0){log('山がない（CPU）');return}
       const t=wall.shift();
-      playerHand.push(t);
-      renderHand();renderWall();log('ツモ: '+t+' — 捨ててください');
+      hands[p].push(t);
+      // ツモ切り：引いた牌をすぐ捨てる
+      const discarded=hands[p].pop();
+      discards[p].push(discarded);
+      renderAll();
+      log(['東','南','西'][p]+"(CPU) がツモ切り: "+discarded);
     }
 
-    function discard(index){
-      if(index<0||index>=playerHand.length) return;
-      const t=playerHand.splice(index,1)[0];
-      renderHand();renderWall();log('捨て: '+t+' — 残り山 '+wall.length+'枚');
-    }
-
-    document.getElementById('dealBtn').addEventListener('click',()=>{deal()});
-    document.getElementById('drawBtn').addEventListener('click',()=>{draw()});
-    document.getElementById('resetBtn').addEventListener('click',()=>{wall=[];playerHand=[];renderHand();renderWall();log('リセットしました')});
-
-    document.getElementById('autoBtn').addEventListener('click',async()=>{
-      if(wall.length===0) deal();
-      // 自動ツモ→自動捨て（最後に手前の一番左を捨てる）を数回繰り返す
-      const cycles=8;
-      for(let i=0;i<cycles;i++){
-        await wait(420);
-        draw();
-        await wait(420);
-        // 自動で捨てる: 最新のツモ牌を捨てる（手札の最後）
-        discard(playerHand.length-1);
+    function nextTurn(){
+      // advance turn clockwise: 3 -> 0 -> 1 -> 2 -> 3 ...
+      turn = (turn+1) % 4;
+      renderAll();
+      // if it's CPU's turn, let them act automatically after short delay
+      if(turn !== 3){
+        setTimeout(()=>{
+          cpuAct(turn);
+          // after CPU acted, move to next
+          nextTurn();
+        }, 450);
+      } else {
+        log('あなたの番です。ツモするか、手牌をクリックして捨ててください。');
       }
-      log('自動再生終了（'+cycles+'回）');
-    });
+    }
+
+    // 自動ラウンド：プレイヤー以外は自動でツモ切りを続ける。プレイヤーは自動的にツモ＋ツモ切り（見栄え用）
+    async function autoRound(){
+      if(wall.length===0) deal();
+      const steps=24; // 適当な手動サイクル数
+      for(let i=0;i<steps;i++){
+        await wait(320);
+        // current turn acts
+        if(turn===3){
+          // 自動のプレイヤー動作: ツモして直後に一番右を自動で切る
+          if(wall.length>0){const t=wall.shift();hands[3].push(t);renderAll();log('自動: あなたツモ '+t);}
+          await wait(220);
+          if(hands[3].length>0){const discarded=hands[3].pop();discards[3].push(discarded);renderAll();log('自動: あなた捨て '+discarded)}
+          turn=(turn+1)%4;
+        } else {
+          if(wall.length>0){const t=wall.shift();hands[turn].push(t);const discarded=hands[turn].pop();discards[turn].push(discarded);renderAll();log(['東','南','西'][turn]+"(CPU) 自動ツモ切り: "+discarded)}
+          turn=(turn+1)%4;
+        }
+      }
+      log('自動ラウンド終了（表示用）。');
+    }
 
     function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 
-    // 初期表示: 山だけ見せる
-    wall=shuffle(makeTiles());renderWall();
+    document.getElementById('dealBtn').addEventListener('click',deal);
+    document.getElementById('drawBtn').addEventListener('click',drawForPlayer);
+    document.getElementById('nextBtn').addEventListener('click',()=>{nextTurn()});
+    document.getElementById('resetBtn').addEventListener('click',()=>{wall=[];for(let p=0;p<4;p++){hands[p]=[];discards[p]=[]}renderAll();log('リセットしました');});
+    document.getElementById('autoRound').addEventListener('click',()=>{autoRound()});
+
+    // 初期表示
+    wall=shuffle(makeTiles());renderAll();
   </script>
 </body>
 </html>
