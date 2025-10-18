@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>簡易麻雀デモ</title>
+  <style>
+    :root{--bg:#0f1724;--card:#fff;--muted:#cbd5e1}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo, sans-serif;background:linear-gradient(180deg,#071226 0%,var(--bg) 100%);color:var(--muted)}
+    .app{max-width:980px;margin:28px auto;padding:20px;border-radius:12px}
+    h1{color:#f8fafc;font-size:20px;margin:0 0 8px}
+    p{margin:0 0 14px}
+    .board{background:rgba(255,255,255,0.03);padding:18px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    button{background:#0ea5a9;border:0;padding:8px 12px;border-radius:8px;color:white;cursor:pointer;font-weight:600}
+    button.secondary{background:#475569}
+    .row{display:flex;gap:12px;align-items:center}
+    .wall{display:flex;gap:4px;align-items:center;padding:10px;flex-wrap:wrap}
+    .tile{width:48px;height:72px;background:linear-gradient(180deg,#ffffff,#f1f5f9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#0b1f2b;box-shadow:0 4px 10px rgba(2,6,23,0.2);cursor:pointer;transition:transform .22s}
+    .tile.small{width:36px;height:54px;font-size:13px}
+    .tiles-area{display:flex;gap:8px;align-items:flex-end;min-height:92px}
+    .player-hand{padding:12px;background:rgba(255,255,255,0.02);border-radius:8px}
+    .log{margin-top:12px;color:#94a3b8;min-height:30px}
+    .deal-anim{animation:deal .45s ease forwards}
+    @keyframes deal{from{transform:translateY(-40px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+    .hint{font-size:12px;color:#94a3b8}
+    .footer{margin-top:12px;font-size:13px;color:#94a3b8}
+    .badge{background:#334155;padding:6px 8px;border-radius:8px;color:#e2e8f0;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="board">
+      <h1>簡易麻雀デモ（GIF向け）</h1>
+      <p class="hint">透明なロジックで動くシンプルな1人向けデモ: 配牌→ツモ→捨てる を再生できます。GIFにすると操作アニメーションが映えます。</p>
+
+      <div class="controls">
+        <button id="dealBtn">配牌（最初の14枚）</button>
+        <button id="drawBtn" class="secondary">ツモ</button>
+        <button id="autoBtn">自動で数回ツモ（GIF用）</button>
+        <button id="resetBtn" class="secondary">リセット</button>
+        <div style="margin-left:auto" class="badge">簡易版</div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <div class="player-hand" id="playerArea">
+            <div style="font-size:13px;color:#cbd5e1;margin-bottom:8px">プレイヤーの手札（クリックで捨てる）</div>
+            <div class="tiles-area" id="hand"></div>
+          </div>
+
+          <div class="log" id="log">準備完了 — 「配牌」を押してください。</div>
+        </div>
+
+        <div style="width:220px;margin-left:12px">
+          <div style="font-size:13px;color:#cbd5e1;margin-bottom:8px">山（残り）</div>
+          <div class="wall" id="wallPreview"></div>
+          <div style="font-size:12px;margin-top:8px;color:#94a3b8">ツモすると上から1枚取ります。GIF用途なら「自動で数回ツモ」を押すと動きます。</div>
+        </div>
+      </div>
+
+      <div class="footer">出力形式: テキストタイル（1m〜9m,1p〜9p,1s〜9s） • エフェクト: 配牌アニメ</div>
+    </div>
+  </div>
+
+  <script>
+    // 簡易タイルセット: 1-9 の 3 スーツを 4枚ずつ（計108枚）。ドラなどは無視。
+    function makeTiles(){
+      const suits=['m','p','s'];
+      const tiles=[];
+      for(const s of suits){
+        for(let n=1;n<=9;n++){
+          for(let i=0;i<4;i++) tiles.push(n + s);
+        }
+      }
+      return tiles;
+    }
+
+    function shuffle(a){
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    let wall=[];let playerHand=[];
+    const handEl=document.getElementById('hand');
+    const wallEl=document.getElementById('wallPreview');
+    const logEl=document.getElementById('log');
+
+    function renderHand(){
+      handEl.innerHTML='';
+      playerHand.forEach((t,i)=>{
+        const d=document.createElement('div');d.className='tile deal-anim';d.textContent=t;d.title='クリックで捨てる';
+        d.onclick=()=>{discard(i)};
+        handEl.appendChild(d);
+      });
+    }
+
+    function renderWall(){
+      wallEl.innerHTML='';
+      // show up to 15 small tiles
+      const preview=wall.slice(0,15);
+      preview.forEach(t=>{const d=document.createElement('div');d.className='tile small';d.textContent=t;wallEl.appendChild(d)});
+    }
+
+    function log(msg){logEl.textContent=msg}
+
+    function deal(){
+      const base=makeTiles();shuffle(base);
+      wall=base.slice();
+      playerHand=[];
+      // 配牌: 13枚、親のとき14枚でもいいがここは14枚にして動きが分かりやすい
+      for(let i=0;i<14;i++){
+        playerHand.push(wall.shift());
+      }
+      renderHand();renderWall();log('配牌しました — 14枚（最初の1枚はツモ済み想定）');
+    }
+
+    function draw(){
+      if(wall.length===0){log('山がありません');return}
+      const t=wall.shift();
+      playerHand.push(t);
+      renderHand();renderWall();log('ツモ: '+t+' — 捨ててください');
+    }
+
+    function discard(index){
+      if(index<0||index>=playerHand.length) return;
+      const t=playerHand.splice(index,1)[0];
+      renderHand();renderWall();log('捨て: '+t+' — 残り山 '+wall.length+'枚');
+    }
+
+    document.getElementById('dealBtn').addEventListener('click',()=>{deal()});
+    document.getElementById('drawBtn').addEventListener('click',()=>{draw()});
+    document.getElementById('resetBtn').addEventListener('click',()=>{wall=[];playerHand=[];renderHand();renderWall();log('リセットしました')});
+
+    document.getElementById('autoBtn').addEventListener('click',async()=>{
+      if(wall.length===0) deal();
+      // 自動ツモ→自動捨て（最後に手前の一番左を捨てる）を数回繰り返す
+      const cycles=8;
+      for(let i=0;i<cycles;i++){
+        await wait(420);
+        draw();
+        await wait(420);
+        // 自動で捨てる: 最新のツモ牌を捨てる（手札の最後）
+        discard(playerHand.length-1);
+      }
+      log('自動再生終了（'+cycles+'回）');
+    });
+
+    function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+
+    // 初期表示: 山だけ見せる
+    wall=shuffle(makeTiles());renderWall();
+  </script>
+</body>
+</html>
